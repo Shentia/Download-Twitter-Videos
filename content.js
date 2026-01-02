@@ -156,7 +156,61 @@ function init() {
         subtree: true
     });
     injectButtons();
+    // Check for updates
+    chrome.runtime.sendMessage({ action: "CHECK_UPDATE" });
 }
+
+function showUpdateNotification(version) {
+    if (document.getElementById('xvd-update-banner')) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'xvd-update-banner';
+    banner.style.position = 'fixed';
+    banner.style.bottom = '20px'; // Bottom right is less intrusive than top
+    banner.style.right = '20px';
+    banner.style.maxWidth = '300px';
+    banner.style.backgroundColor = '#1d9bf0';
+    banner.style.color = 'white';
+    banner.style.zIndex = '9999';
+    banner.style.padding = '15px';
+    banner.style.borderRadius = '8px';
+    banner.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+    banner.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+    banner.style.animation = 'slideIn 0.3s ease-out';
+    
+    banner.innerHTML = `
+        <div style="margin-bottom: 8px; font-weight: bold; font-size: 14px;">Update Available</div>
+        <div style="font-size: 13px; margin-bottom: 10px;">
+            X Video Downloader v${version} is now available.
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <a href="https://github.com/Shentia/Download-Twitter-Videos" target="_blank" style="color: white; text-decoration: none; background: rgba(255,255,255,0.2); padding: 5px 10px; border-radius: 4px; font-size: 12px;">Update Now</a>
+            <span id="xvd-close-banner" style="cursor: pointer; font-size: 12px; opacity: 0.8;">Dismiss</span>
+        </div>
+    `;
+
+    // Add animation keyframes
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+
+    document.body.appendChild(banner);
+
+    document.getElementById('xvd-close-banner').addEventListener('click', () => {
+        banner.remove();
+    });
+}
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "UPDATE_AVAILABLE") {
+        showUpdateNotification(request.version);
+    }
+});
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
