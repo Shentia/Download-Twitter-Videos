@@ -7,7 +7,7 @@ X Video Downloader is a lightweight browser extension designed to help you downl
 * One-click download button added to every video post.
 * Fast and easy to use.
 
-![Download Button Example](https://github.com/user-attachments/assets/e8030062-1234-4567-8901-234567890123)
+![Download Button Example]([https://github.com/user-attachments/assets/e8030062-1234-4567-8901-234567890123](https://github.com/user-attachments/assets/0739ce9f-1f8d-4826-a784-1c4455731fb5))
 
 ## Installation Guide
 Since this extension is hosted on GitHub, you can install it manually in your browser by following these steps:
