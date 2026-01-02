@@ -22,6 +22,7 @@ function createDownloadButton() {
     div.style.justifyContent = 'center';
     div.style.cursor = 'pointer';
     div.style.marginLeft = '10px'; // Add some spacing
+    div.style.position = 'relative'; // Ensure absolute children are contained
 
     div.innerHTML = `
         <div class="css-1dbjc4n r-xoduu5">
