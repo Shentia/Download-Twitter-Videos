@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "X Reply Assistant",
-  "version": "1.0.0",
-  "description": "Reply to multiple tweets on X (Twitter) with custom messages",
+  "name": "X Video Downloader",
+  "version": "1.0",
+  "description": "Download videos from X (formerly Twitter)",
   "permissions": [
-    "storage",
-    "activeTab"
+    "activeTab",
+    "downloads"
   ],
   "host_permissions": [
     "https://twitter.com/*",
@@ -13,23 +13,27 @@
   ],
   "content_scripts": [
     {
-      "matches": ["https://twitter.com/*", "https://x.com/*"],
+      "matches": [
+        "https://twitter.com/*",
+        "https://x.com/*"
+      ],
       "js": ["content.js"],
-      "css": ["sidebar.css"],
-      "run_at": "document_end"
+      "css": ["styles.css"]
+    },
+    {
+      "matches": [
+        "https://twitter.com/*",
+        "https://x.com/*"
+      ],
+      "js": ["main.js"],
+      "world": "MAIN"
     }
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
-  },
-  "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+    "default_title": "Download X Video"
   }
 }
