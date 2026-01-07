@@ -49,18 +49,23 @@ async function checkForUpdates(specificTabId = null) {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "download") {
-        console.log("Downloading:", request.url);
+        // The sender object contains information about the tab that sent the message
+        console.log("Downloading from tab:", sender.tab.id);
+        
         chrome.downloads.download({
             url: request.url,
             filename: request.filename,
-            saveAs: false // Set to true if you want the user to choose location
+            saveAs: false,
+            // Adding conflictAction can sometimes help with permission trust
+            conflictAction: 'uniquify' 
         }, (downloadId) => {
             if (chrome.runtime.lastError) {
-                console.error("Download failed:", chrome.runtime.lastError);
-            } else {
-                console.log("Download started with ID:", downloadId);
+                console.error("Download failed:", chrome.runtime.lastError.message);
+                // If it fails, it might be because the URL is cross-origin 
+                // and the background script needs to fetch it first.
             }
         });
+        return true; // Keep the message channel open for async response
     } else if (request.action === "CHECK_UPDATE") {
         checkForUpdates(sender.tab ? sender.tab.id : null);
     }
