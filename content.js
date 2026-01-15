@@ -217,3 +217,182 @@ if (document.readyState === 'loading') {
 } else {
     init();
 }
+
+// --- Automation Logic ---
+
+let isAutomating = false;
+let automationConfig = {
+    hashtags: [],
+    comment: ""
+};
+
+// Keep track of processed IDs to persist across re-renders
+const processedTweetIds = new Set();
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === "START_AUTOMATION") {
+        if (!isAutomating) {
+            isAutomating = true;
+            automationConfig.hashtags = request.hashtags;
+            automationConfig.comment = request.comment;
+            console.log("XVD: Automation started", automationConfig);
+            processNextTweet();
+        }
+    } else if (request.action === "STOP_AUTOMATION") {
+        isAutomating = false;
+        console.log("XVD: Automation stopped");
+    }
+});
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getTweetId(article) {
+    try {
+        // Look for the timestamp link which contains /status/<ID>
+        const timeElement = article.querySelector('time');
+        if (timeElement) {
+            const link = timeElement.closest('a');
+            if (link) {
+                const href = link.getAttribute('href');
+                const match = href.match(/\/status\/(\d+)/);
+                return match ? match[1] : null;
+            }
+        }
+    } catch (e) {
+        return null;
+    }
+    return null;
+}
+
+
+async function processNextTweet() {
+    if (!isAutomating) return;
+
+    // Find all retweet buttons that are eligible for interaction
+    const retweetButtons = Array.from(document.querySelectorAll('[data-testid="retweet"]'));
+    
+    let targetButton = null;
+    let targetArticle = null;
+    let targetId = null;
+    
+    for (const btn of retweetButtons) {
+        // Find the parent article to ensure we haven't processed this specific tweet instance
+        const tweetArticle = btn.closest('article');
+        
+        if (tweetArticle) {
+            const id = getTweetId(tweetArticle);
+            
+            // Check if we have processed this ID before
+            // We use the ID if found, otherwise (failsafe) fallback to attribute
+            if ((id && !processedTweetIds.has(id)) || (!id && !tweetArticle.hasAttribute('data-xvd-processed'))) {
+                 targetButton = btn;
+                 targetArticle = tweetArticle;
+                 targetId = id;
+                 
+                 // Mark as processed
+                 if(id) processedTweetIds.add(id);
+                 tweetArticle.setAttribute('data-xvd-processed', 'true');
+                 
+                 break;
+            }
+        }
+    }
+
+    if (!targetButton) {
+        console.log("XVD: No new tweets found in view, scrolling...");
+        window.scrollBy(0, 1000); // Scroll down more aggressively
+        await sleep(3000); // Wait longer for load
+        processNextTweet(); // Retry
+        return;
+    }
+
+    try {
+        console.log(`XVD: Processing tweet ID: ${targetId}`);
+        
+        // Ensure the button is visible
+        targetButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        await sleep(1000);
+
+        // 1. Click Repost (Retweet) Button
+        targetButton.click();
+        await sleep(1000); // Wait for menu
+
+        // 2. Click Quote
+        // Primary selector: specific testid
+        let quoteBtn = document.querySelector('[data-testid="RetweetConfirm-quote"]');
+        
+        // Fallback: search menu items for text "Quote"
+        if (!quoteBtn) {
+             const menuItems = Array.from(document.querySelectorAll('[role="menuitem"]'));
+             quoteBtn = menuItems.find(el => el.textContent.includes("Quote"));
+        }
+
+        if (!quoteBtn) {
+            console.log("XVD: Could not find Quote button. Closing menu.");
+            document.body.click(); // Click background to close
+            await sleep(1000);
+        } else {
+            console.log("XVD: Clicking Quote...");
+            quoteBtn.click();
+            await sleep(2000); // Wait for modal
+
+            // 3. Type text
+            const textBox = document.querySelector('[data-testid="tweetTextarea_0"]');
+            if (textBox) {
+                // Combine all hashtags
+                const allHashtags = automationConfig.hashtags
+                    .map(tag => tag.trim())
+                    .filter(tag => tag.length > 0)
+                    .map(tag => tag.startsWith('#') ? tag : `#${tag}`)
+                    .join(' ');
+                
+                const textToType = `${automationConfig.comment} ${allHashtags}`;
+                
+                // Focus and type
+                textBox.focus();
+                document.execCommand('insertText', false, textToType);
+                
+                await sleep(1500);
+                
+                // 4. Click Post
+                const postButton = document.querySelector('[data-testid="tweetButton"]');
+                if (postButton && !postButton.disabled) {
+                    postButton.click();
+                    console.log("XVD: Posted successfully.");
+                    // After posting, wait a bit for the modal to close and the tweet to send
+                    await sleep(3000);
+                } else {
+                    console.warn("XVD: Post button disabled or missing.");
+                    // Attempt to close modal if we failed
+                    const closeBtn = document.querySelector('[data-testid="app-bar-close"]');
+                    if(closeBtn) closeBtn.click();
+                }
+            } else {
+                 console.log("XVD: Could not find text box.");
+                 // Close menu/modal if open?
+                 document.body.click();
+            }
+        }
+
+        
+    } catch (e) {
+        console.error("XVD: Error during automation step", e);
+    }
+
+    // Always scroll past the processed tweet to prepare for the next one
+    if (targetArticle) {
+        targetArticle.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        window.scrollBy(0, 500); // Push it up and out, bringing new ones in
+    }
+
+    // Rate limiting: 10 times per minute = 6 seconds per action
+    // We add a little random delay to be safe and more human-like (6s to 8s total cycle)
+    if (isAutomating) {
+        const delay = 6000 + Math.random() * 2000;
+        console.log(`XVD: Waiting ${Math.round(delay/1000)}s before next action...`);
+        await sleep(delay);
+        processNextTweet();
+    }
+}
