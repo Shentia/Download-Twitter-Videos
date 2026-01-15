@@ -1,13 +1,11 @@
 {
   "manifest_version": 3,
   "name": "X Video Downloader",
-  "version": "1.1.5",
+  "version": "1.1.4",
   "description": "Download videos from X (formerly Twitter)",
   "authors": "Ahmadreza Shamimi",
   "permissions": [
-    "downloads",
-    "storage",
-    "scripting"
+    "downloads"
   ],
   "host_permissions": [
     "https://twitter.com/*",
