@@ -227,7 +227,20 @@ let automationConfig = {
 };
 
 // Keep track of processed IDs to persist across re-renders
-const processedTweetIds = new Set();
+let processedTweetIds = new Set();
+
+// Load processed IDs from storage to survive page reloads
+chrome.storage.local.get(['processedTweetIds'], (result) => {
+    if (result.processedTweetIds) {
+        processedTweetIds = new Set(result.processedTweetIds);
+        console.log(`XVD: Loaded ${processedTweetIds.size} processed tweet IDs.`);
+    }
+});
+
+function saveProcessedTweetId(id) {
+    processedTweetIds.add(id);
+    chrome.storage.local.set({ processedTweetIds: Array.from(processedTweetIds) });
+}
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "START_AUTOMATION") {
@@ -236,6 +249,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             automationConfig.hashtags = request.hashtags;
             automationConfig.comment = request.comment;
             console.log("XVD: Automation started", automationConfig);
+            
+            // Clear processed IDs for a fresh start? 
+            // Or maybe the user wants to continue. 
+            // Given the bug report, let's clear it to avoid confusion if they just fixed something.
+            // processedTweetIds.clear(); 
+            // chrome.storage.local.remove('processedTweetIds');
+
             processNextTweet();
         }
     } else if (request.action === "STOP_AUTOMATION") {
@@ -250,15 +270,25 @@ function sleep(ms) {
 
 function getTweetId(article) {
     try {
-        // Look for the timestamp link which contains /status/<ID>
+        // Method 1: Look for the timestamp link which contains /status/<ID>
         const timeElement = article.querySelector('time');
         if (timeElement) {
             const link = timeElement.closest('a');
             if (link) {
                 const href = link.getAttribute('href');
                 const match = href.match(/\/status\/(\d+)/);
-                return match ? match[1] : null;
+                if (match) return match[1];
             }
+        }
+
+        // Method 2: Check for links in the article that might be the status link
+        const links = article.querySelectorAll('a[href*="/status/"]');
+        for (const link of links) {
+            const href = link.getAttribute('href');
+            // Ensure it's a direct status link, not a link to another tweet inside
+            // Usually the status link is something like /username/status/12345
+            const match = href.match(/\/status\/(\d+)$/);
+            if (match) return match[1];
         }
     } catch (e) {
         return null;
@@ -271,7 +301,12 @@ async function processNextTweet() {
     if (!isAutomating) return;
 
     // Find all retweet buttons that are eligible for interaction
-    const retweetButtons = Array.from(document.querySelectorAll('[data-testid="retweet"]'));
+    // Only look for tweets that are actually in or below the current viewport
+    const retweetButtons = Array.from(document.querySelectorAll('[data-testid="retweet"]'))
+        .filter(btn => {
+            const rect = btn.getBoundingClientRect();
+            return rect.top > -100; // Allow a small buffer above the viewport
+        });
     
     let targetButton = null;
     let targetArticle = null;
@@ -292,7 +327,7 @@ async function processNextTweet() {
                  targetId = id;
                  
                  // Mark as processed
-                 if(id) processedTweetIds.add(id);
+                 if(id) saveProcessedTweetId(id);
                  tweetArticle.setAttribute('data-xvd-processed', 'true');
                  
                  break;
@@ -383,8 +418,10 @@ async function processNextTweet() {
 
     // Always scroll past the processed tweet to prepare for the next one
     if (targetArticle) {
-        targetArticle.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        window.scrollBy(0, 500); // Push it up and out, bringing new ones in
+        console.log("XVD: Scrolling past processed tweet...");
+        // Scroll so that the bottom of the article is at the top of the viewport
+        const rect = targetArticle.getBoundingClientRect();
+        window.scrollBy({ top: rect.bottom + 100, behavior: 'smooth' });
     }
 
     // Rate limiting: 10 times per minute = 6 seconds per action
