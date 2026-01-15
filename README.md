@@ -2,6 +2,7 @@
 
 X Video Downloader is a lightweight browser extension designed to help you download videos directly from X (formerly Twitter) with a single click.
 
+Download: https://chromewebstore.google.com/detail/nioboilfnkjklcmnhipjnicfhjbmbpeo?utm_source=item-share-cb
 ## Features
 * Integrates seamlessly into the X user interface.
 * One-click download button added to every video post.
